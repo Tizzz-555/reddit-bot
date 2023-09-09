@@ -72,24 +72,3 @@ def contains_relevant_keywords(text, created_utc):
         if keyword in text.lower() and validator(created_utc):
             return True
     return False
-
-from datetime import time
-
-def is_within_schedule(day, given_time):
-    """Checks if the given time on a specified day is within the provided schedule.
-    
-    :param day: Day of the week (e.g., "Friday", "Saturday", "Sunday")
-    :param given_time: Time to check
-    :return: True if within schedule, False otherwise
-    """
-    schedules = {
-        "Friday": [time(20, 30), time(23, 0)],
-        "Saturday": [time(9, 0), time(23, 0)],
-        "Sunday": [time(9, 0), time(21, 0)],
-    }
-
-    if day not in schedules:
-        return False
-
-    start_time, end_time = schedules[day]
-    return start_time <= given_time < end_time
