@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import time, datetime
 
 
 def is_weekend(date_string):
@@ -50,13 +50,24 @@ def final_convert_to_CEST(time_str, timezone_str):
     return f"{cest_hours:02}:{minutes:02}"
 
 
-def detect_and_convert_time(text):
+def detect_and_convert_time(text, created_utc):
     text = text.lower()
     time_pattern = r"(\d{1,2}(?::\d{1,2})?\s*[apm]{0,2})\s*(est|pst|cst|mst|pacific|central|eastern)"
+    weekday_pattern = r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday)"
+
     matches = re.findall(time_pattern, text)
+    weekdays = re.findall(weekday_pattern, text)
+
+    # If no specific day is mentioned, infer the day from the created_utc
+    if not weekdays:
+        weekdays = [datetime.utcfromtimestamp(created_utc).strftime("%A").lower()]
+
     converted_times = []
     for time_str, timezone_str in matches:
-        converted_times.append(final_convert_to_CEST(time_str, timezone_str))
+        for weekday in weekdays:
+            converted_times.append(
+                (weekday, final_convert_to_CEST(time_str, timezone_str))
+            )
     return converted_times
 
 
@@ -73,11 +84,10 @@ def contains_relevant_keywords(text, created_utc):
             return True
     return False
 
-from datetime import time
 
 def is_within_schedule(day, given_time):
     """Checks if the given time on a specified day is within the provided schedule.
-    
+
     :param day: Day of the week (e.g., "Friday", "Saturday", "Sunday")
     :param given_time: Time to check
     :return: True if within schedule, False otherwise
