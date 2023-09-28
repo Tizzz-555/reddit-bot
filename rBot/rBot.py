@@ -1,19 +1,14 @@
 import praw
 import time
 import logging
-
+from datetime import datetime
+from config import CLIENT_ID, CLIENT_SECRET, USER_AGENT, USERNAME, PASSWORD
 from helpers import (
-    contains_weekend_date,
-    detect_and_convert_time,
-    contains_relevant_keywords,
+    extract_information,
+    convert_date,
+    convert_time,
     is_within_schedule,
 )
-
-
-from datetime import datetime
-
-
-from config import CLIENT_ID, CLIENT_SECRET, USER_AGENT, USERNAME, PASSWORD
 
 
 def main():
@@ -21,7 +16,7 @@ def main():
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
-
+    # Initialize Reddit client
     reddit = praw.Reddit(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
@@ -29,69 +24,39 @@ def main():
         username=USERNAME,
         password=PASSWORD,
     )
+
     subreddit = reddit.subreddit("DestinySherpa")
     logging.info("Bot started")
 
     print("=====================================")
+
     current_datetime = datetime.now()
 
     while True:
         try:
             for submission in subreddit.hot(limit=20):
-                if (
-                    "[lts]" in submission.title.lower()
-                    and "[gos]" not in submission.title.lower()
-                ):
-                    if (
-                        contains_weekend_date(submission.title)
-                        or contains_weekend_date(submission.selftext)
-                        or contains_relevant_keywords(
-                            submission.title, submission.created_utc
-                        )
-                        or contains_relevant_keywords(
-                            submission.selftext, submission.created_utc
-                        )
-                    ):
-                        # Use the enhanced function to extract day and time
-                        converted_times_title = detect_and_convert_time(
-                            submission.title, submission.created_utc
-                        )
-                        converted_times_selftext = detect_and_convert_time(
-                            submission.selftext, submission.created_utc
-                        )
+                if "[lts]" in submission.title.lower():
+                    # Extract information from the title
+                    date_str, time_str, timezone_str = extract_information(
+                        submission.title
+                    )
 
-                        # Filter out past times
-                        future_times_title = [
-                            (day, t)
-                            for day, t in converted_times_title
-                            if datetime.strptime(
-                                f"{current_datetime.year}/{day} {t}", "%Y/%A %H:%M"
-                            )
-                            > current_datetime
-                        ]
-                        future_times_selftext = [
-                            (day, t)
-                            for day, t in converted_times_selftext
-                            if datetime.strptime(
-                                f"{current_datetime.year}/{day} {t}", "%Y/%A %H:%M"
-                            )
-                            > current_datetime
-                        ]
+                    # If any information is missing, skip this submission
+                    if not (date_str and time_str and timezone_str):
+                        continue
 
-                        # Check if the detected times fall within the specified schedule and are in the future
-                        if any(
-                            is_within_schedule(
-                                day.capitalize(), datetime.strptime(t, "%H:%M").time()
-                            )
-                            for day, t in future_times_title + future_times_selftext
-                        ):
-                            print(submission.title)
-                            submission.reply(
-                                "Hello, I would love to be joining this! I am a Warlock. Discord: tix555#1664 Bungie id: tix555#7313"
-                            )
-                            logging.info(f"Replied to post: {submission.id}")
-                            return
+                    # Convert date and time to CEST
+                    date_obj = convert_date(date_str)
+                    time_obj = convert_time(time_str, timezone_str)
 
+                    # Check if the date and time fit into the provided schedule
+                    if is_within_schedule(date_obj, time_obj):
+                        print(submission.title)
+                        submission.reply(
+                            "Hello, I would love to be joining this! I am a Warlock. Discord: tix555#1664 Bungie id: tix555#7313"
+                        )
+                        logging.info(f"Replied to post: {submission.id}")
+                        return
             # Monitor the rate limits
             used = int(reddit.auth.limits["used"])
             remaining = int(reddit.auth.limits["remaining"])
